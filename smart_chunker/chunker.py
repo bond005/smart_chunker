@@ -145,10 +145,18 @@ class SmartChunker:
                         f'have a length of {second_chunk_len} tokens.')
             print(info_msg)
         if (min_similarity_idx == 0) or (first_chunk_len <= self.max_chunk_length):
-            all_chunks.append(first_chunk)
-            if self.verbose:
-                info_msg = f'Sentences from {start_pos} to {start_pos + min_similarity_idx + 1} form a new chunk.'
-                print(info_msg)
+            first_chunk_v2 = ' '.join(sentences[start_pos:(start_pos + min_similarity_idx + 2)])
+            first_chunk_v2_len = calculate_sentence_length(first_chunk_v2, self.tokenizer_)
+            if (first_chunk_v2_len <= self.max_chunk_length) and (first_chunk_v2 != first_chunk):
+                all_chunks.append(first_chunk_v2)
+                if self.verbose:
+                    info_msg = f'Sentences from {start_pos} to {start_pos + min_similarity_idx + 2} form a new chunk.'
+                    print(info_msg)
+            else:
+                all_chunks.append(first_chunk)
+                if self.verbose:
+                    info_msg = f'Sentences from {start_pos} to {start_pos + min_similarity_idx + 1} form a new chunk.'
+                    print(info_msg)
         else:
             all_chunks += self._find_chunks(sentences, start_pos, start_pos + min_similarity_idx + 1)
         if ((start_pos + min_similarity_idx + 1) == (end_pos - 1)) or (second_chunk_len <= self.max_chunk_length):

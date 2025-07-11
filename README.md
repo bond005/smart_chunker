@@ -28,7 +28,7 @@ The smart chunking algorithm consists of the following steps:
 
 **Step 4.** The final variant for dividing the text into two chunks is the one where the semantic similarity between the first and second chunks is minimal.
 
-For each of the two identified chunks, this procedure is repeated recursively until the chunks are sufficiently small (less than a predefined maximum allowable chunk length).
+For each of the two identified chunks, this procedure is repeated recursively until the chunks are sufficiently small (less than a predefined maximum allowable chunk length). The resulting chunks may overlap by one sentence (although this is not always the case).  
 
 Installing
 ----------
@@ -117,15 +117,15 @@ During the execution process, you may see the following message in the log:
 There are 11 sentences in the text.
 Sentences from 0 to 6 have a length of 188 tokens.
 Sentences from 6 to 11 have a length of 192 tokens.
-Sentences from 0 to 6 form a new chunk.
+Sentences from 0 to 7 form a new chunk.
 Sentences from 6 to 11 form a new chunk.
 ```
 
-As a result of the execution, you will see two chunks:
+As a result of the execution, you will see two chunks (with overlapping content in one sentence):
 
-- **The first chunk:** There are many different approaches to Transformer fine-tuning. First, there is a development direction dedicated to the modification of the loss function and a specific problem statement. For example, training problem could be set as machine reading comprehence (question answering) instead of the standard sequence classification, or focal loss, dice loss and other things from other deep learning domains could be used instead of the standard cross-entropy loss function. Second, there are papers devoted to BERT extension, related to adding more input information from the knowledge graph, morpho-syntactic parsers and other things. Third, there is a group of algorithms associated with changing the learning procedure, such as metric learning (contrastive learning). Each direction has its own advantages and disadvantages, but the metric learning seems the most promising to us.
+- **The first chunk:** *There are many different approaches to Transformer fine-tuning. First, there is a development direction dedicated to the modification of the loss function and a specific problem statement. For example, training problem could be set as machine reading comprehence (question answering) instead of the standard sequence classification, or focal loss, dice loss and other things from other deep learning domains could be used instead of the standard cross-entropy loss function. Second, there are papers devoted to BERT extension, related to adding more input information from the knowledge graph, morpho-syntactic parsers and other things. Third, there is a group of algorithms associated with changing the learning procedure, such as metric learning (contrastive learning). Each direction has its own advantages and disadvantages, but the metric learning seems the most promising to us. Because the goal of any training is not to overfit the training sample and not just to take the top of the leaderboard on a particular test sample from the general population, but to ensure the highest generalization ability on the general population as a whole.*
 
-- **The second chunk:** Because the goal of any training is not to overfit the training sample and not just to take the top of the leaderboard on a particular test sample from the general population, but to ensure the highest generalization ability on the general population as a whole. High generalization ability is associated with good separation in the feature space. A good separation is possible when objects of different classes form sufficiently compact regions in our space. And methods of contrastive learning achieve better separation. Our goal is to test, on the basis of the RuNNE competition (Artemova et al., 2022), how true are these theoretical considerations in practice and how much will the use of comparative learning in BERT’s fine tuning allow us to build more compact high-level representations of different classes of named entities and, as a result, improve the quality of recognition of named entities.
+- **The second chunk:** *Because the goal of any training is not to overfit the training sample and not just to take the top of the leaderboard on a particular test sample from the general population, but to ensure the highest generalization ability on the general population as a whole. High generalization ability is associated with good separation in the feature space. A good separation is possible when objects of different classes form sufficiently compact regions in our space. And methods of contrastive learning achieve better separation. Our goal is to test, on the basis of the RuNNE competition (Artemova et al., 2022), how true are these theoretical considerations in practice and how much will the use of comparative learning in BERT’s fine tuning allow us to build more compact high-level representations of different classes of named entities and, as a result, improve the quality of recognition of named entities.*
 
 Demo
 ----
@@ -162,6 +162,13 @@ The argument **--minibatch** determines the size of the mini-batch when calculat
 The argument **--newline** indicates whether to use the newline character as a criterion for sentence termination when preliminary dividing text into sentences (before dividing it into chunks as sentence groups).
 
 The argument **--verbose** specifies the need to log the steps of the text splitting algorithm into chunks (if this argument is not specified, then the algorithm works "silently").
+
+Breaking Changes
+-------
+
+**Breaking changes in version 0.0.2**
+- The boundaries of chunks can now overlap by one sentence. This behavior of the chunker can reduce the significance of possible text segmentation errors.
+
 
 License
 -------
