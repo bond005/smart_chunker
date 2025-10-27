@@ -1,9 +1,11 @@
+from functools import reduce
 import math
 from typing import List, Tuple
 import warnings
 
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from tqdm import trange, tqdm
 
 from smart_chunker.sentenizer import split_text_into_sentences, calculate_sentence_length
 
@@ -47,36 +49,35 @@ class SmartChunker:
                 trust_remote_code=True
             )
 
-    def _get_pair(self, sentences: List[str], split_index: int) -> List[str]:
-        start_pos = 0
+    def _get_pair(self, tokenized_sentences: List[List[str]],
+                  split_index: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         middle_pos = split_index + 1
-        end_pos = len(sentences)
-        new_pair = [' '.join(sentences[start_pos:middle_pos]), ' '.join(sentences[middle_pos:end_pos])]
-        left_length = calculate_sentence_length(new_pair[0], self.tokenizer_)
-        right_length = calculate_sentence_length(new_pair[1], self.tokenizer_)
-        while (left_length + right_length) >= self.model_.config.max_position_embeddings:
-            if left_length > right_length:
-                start_pos += 1
-            else:
-                end_pos -= 1
-            if (start_pos >= middle_pos) or (end_pos <= middle_pos):
-                start_pos = middle_pos - 1
-                end_pos = middle_pos + 1
-                del new_pair
-                new_pair = [' '.join(sentences[start_pos:middle_pos]), ' '.join(sentences[middle_pos:end_pos])]
+        start_pos = middle_pos - 1
+        while start_pos >= 0:
+            left_length = sum(map(lambda it: len(it), tokenized_sentences[start_pos:middle_pos]))
+            if left_length > (self.model_.config.max_position_embeddings // 4):
                 break
-            del new_pair
-            new_pair = [' '.join(sentences[start_pos:middle_pos]), ' '.join(sentences[middle_pos:end_pos])]
-            left_length = calculate_sentence_length(new_pair[0], self.tokenizer_)
-            right_length = calculate_sentence_length(new_pair[1], self.tokenizer_)
-        return new_pair
+            start_pos -= 1
+        start_pos += 1
+        if start_pos >= middle_pos:
+            start_pos = middle_pos - 1
+        end_pos = middle_pos + 1
+        while end_pos >= len(tokenized_sentences):
+            right_length = sum(map(lambda it: len(it), tokenized_sentences[middle_pos:end_pos]))
+            if right_length > (self.model_.config.max_position_embeddings // 4):
+                break
+            end_pos += 1
+        end_pos -= 1
+        if end_pos < (middle_pos + 1):
+            end_pos = middle_pos + 1
+        return (start_pos, middle_pos), (middle_pos, end_pos)
 
     def _calculate_similarity_func(self, pairs: List[List[str]]) -> List[float]:
         if len(pairs) < 1:
             return []
         n_batches = math.ceil(len(pairs) / self.minibatch_size)
         scores = []
-        for batch_idx in range(n_batches):
+        for batch_idx in (trange(n_batches) if self.verbose else range(n_batches)):
             batch_start = batch_idx * self.minibatch_size
             batch_end = min(len(pairs), batch_start + self.minibatch_size)
             with torch.no_grad():
@@ -146,11 +147,27 @@ class SmartChunker:
             print(f'There are {len(sentences)} sentences in the text.')
         if len(sentences) < 2:
             return sentences
+        tokenized_sentences: List[List[str]] = []
+        if self.verbose:
+            print(f'All sentences tokenization with {self.reranker_name} tokenizer is started.')
+        for cur_sent in (tqdm(sentences) if self.verbose else sentences):
+            tokenized_sentences.append(self.tokenizer_.tokenize(cur_sent, add_special_tokens=True))
+        if self.verbose:
+            print(f'All sentences tokenization with {self.reranker_name} tokenizer is finished.')
         pairs = []
         for idx in range(len(sentences) - 1):
-            pairs.append(self._get_pair(sentences, idx))
+            left_chunk_bounds, right_chunk_bounds = self._get_pair(tokenized_sentences, idx)
+            pairs.append([
+                ' '.join(sentences[left_chunk_bounds[0]:left_chunk_bounds[1]]),
+                ' '.join(sentences[right_chunk_bounds[0]:right_chunk_bounds[1]])
+            ])
+            del left_chunk_bounds, right_chunk_bounds
+        if self.verbose:
+            print(f'Chunk candidates scoring with {self.reranker_name} model is started.')
         scores = self._calculate_similarity_func(pairs)
         del pairs
+        if self.verbose:
+            print(f'Chunk candidates scoring with {self.reranker_name} model is finished.')
         chunk_bounds = self._find_chunks(sentences, scores, 0, len(sentences))
         del scores
         chunks = []
