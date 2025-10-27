@@ -115,9 +115,10 @@ During the execution process, you may see the following message in the log:
 
 ```text
 There are 11 sentences in the text.
+Sentences from 0 to 11 have a length of 378 tokens.
 Sentences from 0 to 6 have a length of 188 tokens.
+Sentences from 0 to 6 form a new chunk.
 Sentences from 6 to 11 have a length of 192 tokens.
-Sentences from 0 to 7 form a new chunk.
 Sentences from 6 to 11 form a new chunk.
 ```
 
@@ -165,6 +166,9 @@ The argument **--verbose** specifies the need to log the steps of the text split
 
 Breaking Changes
 -------
+
+**Breaking changes in version 0.0.3**
+- The chunking process has been optimized by placing the call to the reranker outside the recursive portion of the process.
 
 **Breaking changes in version 0.0.2**
 - The boundaries of chunks can now overlap by one sentence. This behavior of the chunker can reduce the significance of possible text segmentation errors.

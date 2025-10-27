@@ -71,31 +71,9 @@ class SmartChunker:
             right_length = calculate_sentence_length(new_pair[1], self.tokenizer_)
         return new_pair
 
-    def _calculate_similarity_func(self, sentences: List[str]) -> List[Tuple[int, float]]:
-        if len(sentences) < 2:
+    def _calculate_similarity_func(self, pairs: List[List[str]]) -> List[float]:
+        if len(pairs) < 1:
             return []
-        variants_of_split_index = list(filter(
-            lambda idx: (calculate_sentence_length(' '.join(sentences[0:(idx + 1)]), self.tokenizer_) <=
-                         self.max_chunk_length) and
-                        (calculate_sentence_length(' '.join(sentences[(idx + 1):]), self.tokenizer_) <=
-                         self.max_chunk_length) and
-                        (calculate_sentence_length(' '.join(sentences[0:(idx + 1)]), self.tokenizer_) >=
-                         self.max_chunk_length // 3) and
-                        (calculate_sentence_length(' '.join(sentences[(idx + 1):]), self.tokenizer_) >=
-                         self.max_chunk_length // 3),
-            range(len(sentences) - 1)
-        ))
-        if len(variants_of_split_index) == 0:
-            variants_of_split_index = list(filter(
-                lambda idx: (calculate_sentence_length(' '.join(sentences[0:(idx + 1)]), self.tokenizer_) >=
-                             self.max_chunk_length // 3) and
-                            (calculate_sentence_length(' '.join(sentences[(idx + 1):]), self.tokenizer_) >=
-                             self.max_chunk_length // 3),
-                range(len(sentences) - 1)
-            ))
-            if len(variants_of_split_index) == 0:
-                variants_of_split_index = list(range(len(sentences) - 1))
-        pairs = [self._get_pair(sentences, idx) for idx in variants_of_split_index]
         n_batches = math.ceil(len(pairs) / self.minibatch_size)
         scores = []
         for batch_idx in range(n_batches):
@@ -111,62 +89,50 @@ class SmartChunker:
                     return_dict=True
                 ).logits.float().cpu().numpy().flatten().tolist()
                 del inputs
-        return list(zip(variants_of_split_index, scores))
+        if len(scores) != len(pairs):
+            err_msg = (f'The number of text pairs do not correspond to the number of calculated pair scores! '
+                       f'{len(pairs)} != {len(scores)}')
+            raise RuntimeError(err_msg)
+        return scores
 
-    def _find_chunks(self, sentences: List[str], start_pos: int, end_pos: int) -> List[str]:
-        full_text_len = calculate_sentence_length(' '.join(sentences[start_pos:end_pos]), self.tokenizer_)
-        if (full_text_len <= self.max_chunk_length) or ((end_pos - start_pos) < 2):
+    def _find_chunks(self, sentences: List[str], split_scores: List[float],
+                     start_pos: int, end_pos: int) -> List[Tuple[int, int]]:
+        if len(sentences) < 1:
+            return []
+        if start_pos < 0:
+            err_msg = f'The `start_pos` is wrong! Expected non-negative integer, got {start_pos}.'
+            raise ValueError(err_msg)
+        if end_pos > len(sentences):
+            err_msg = f'The `end_pos` is wrong! Expected {len(sentences)} or less, got {end_pos}'
+            raise ValueError(err_msg)
+        if start_pos >= end_pos:
+            err_msg = f'The chunk boundaries ({start_pos}, {end_pos}) are wrong!'
+            raise ValueError(err_msg)
+        if (len(sentences) < 2) or (start_pos == (end_pos - 1)):
             if self.verbose:
-                info_msg = f'Sentences from {start_pos} to {end_pos} form a new chunk.'
-                print(info_msg)
-            return [' '.join(sentences[start_pos:end_pos])]
-        semantic_similarities = self._calculate_similarity_func(sentences[start_pos:end_pos])
-        if len(semantic_similarities) == 0:
-            if self.verbose:
-                info_msg = f'Sentences from {start_pos} to {end_pos} form a new chunk.'
-                print(info_msg)
-            return [' '.join(sentences[start_pos:end_pos])]
-        min_similarity_idx = semantic_similarities[0][0]
-        min_similarity_val = semantic_similarities[0][1]
-        for idx, val in semantic_similarities[1:]:
-            if val < min_similarity_val:
-                min_similarity_idx = idx
-                min_similarity_val = val
-        first_chunk = ' '.join(sentences[start_pos:(start_pos + min_similarity_idx + 1)])
-        second_chunk = ' '.join(sentences[(start_pos + min_similarity_idx + 1):end_pos])
-        all_chunks = []
-        first_chunk_len = calculate_sentence_length(first_chunk, self.tokenizer_)
-        second_chunk_len = calculate_sentence_length(second_chunk, self.tokenizer_)
+                print(f'Sentences from {start_pos} to {end_pos} form a new chunk.')
+            return [(start_pos, end_pos)]
+        if len(split_scores) != (len(sentences) - 1):
+            err_msg = (f'The sentences do not correspond to the split scores! '
+                       f'{len(sentences)} != {len(split_scores) + 1}')
+            raise ValueError(err_msg)
+        chunk_length = calculate_sentence_length(' '.join(sentences[start_pos:end_pos]), self.tokenizer_)
         if self.verbose:
-            info_msg = (f'Sentences from {start_pos} to {start_pos + min_similarity_idx + 1} '
-                        f'have a length of {first_chunk_len} tokens.')
-            print(info_msg)
-            info_msg = (f'Sentences from {start_pos + min_similarity_idx + 1} to {end_pos} '
-                        f'have a length of {second_chunk_len} tokens.')
-            print(info_msg)
-        if (min_similarity_idx == 0) or (first_chunk_len <= self.max_chunk_length):
-            first_chunk_v2 = ' '.join(sentences[start_pos:(start_pos + min_similarity_idx + 2)])
-            first_chunk_v2_len = calculate_sentence_length(first_chunk_v2, self.tokenizer_)
-            if (first_chunk_v2_len <= self.max_chunk_length) and (first_chunk_v2 != first_chunk):
-                all_chunks.append(first_chunk_v2)
-                if self.verbose:
-                    info_msg = f'Sentences from {start_pos} to {start_pos + min_similarity_idx + 2} form a new chunk.'
-                    print(info_msg)
-            else:
-                all_chunks.append(first_chunk)
-                if self.verbose:
-                    info_msg = f'Sentences from {start_pos} to {start_pos + min_similarity_idx + 1} form a new chunk.'
-                    print(info_msg)
-        else:
-            all_chunks += self._find_chunks(sentences, start_pos, start_pos + min_similarity_idx + 1)
-        if ((start_pos + min_similarity_idx + 1) == (end_pos - 1)) or (second_chunk_len <= self.max_chunk_length):
-            all_chunks.append(second_chunk)
+            print(f'Sentences from {start_pos} to {end_pos} have a length of {chunk_length} tokens.')
+        if chunk_length <= self.max_chunk_length:
             if self.verbose:
-                info_msg = f'Sentences from {start_pos + min_similarity_idx + 1} to {end_pos} form a new chunk.'
-                print(info_msg)
-        else:
-            all_chunks += self._find_chunks(sentences, start_pos + min_similarity_idx + 1, end_pos)
-        return all_chunks
+                print(f'Sentences from {start_pos} to {end_pos} form a new chunk.')
+            return [(start_pos, end_pos)]
+        best_split_idx = start_pos
+        best_score = split_scores[start_pos]
+        for cur_split_idx in range(start_pos + 1, end_pos - 1):
+            cur_score = split_scores[cur_split_idx]
+            if cur_score < best_score:
+                best_score = cur_score
+                best_split_idx = cur_split_idx
+        chunks = self._find_chunks(sentences, split_scores, start_pos, best_split_idx + 1)
+        chunks += self._find_chunks(sentences, split_scores, best_split_idx + 1, end_pos)
+        return chunks
 
     def split_into_chunks(self, source_text: str) -> List[str]:
         source_text_ = source_text.strip()
@@ -178,4 +144,24 @@ class SmartChunker:
                                               (2 * self.max_chunk_length) // 3, self.tokenizer_)
         if self.verbose:
             print(f'There are {len(sentences)} sentences in the text.')
-        return self._find_chunks(sentences, 0, len(sentences))
+        if len(sentences) < 2:
+            return sentences
+        pairs = []
+        for idx in range(len(sentences) - 1):
+            pairs.append(self._get_pair(sentences, idx))
+        scores = self._calculate_similarity_func(pairs)
+        del pairs
+        chunk_bounds = self._find_chunks(sentences, scores, 0, len(sentences))
+        del scores
+        chunks = []
+        for chunk_idx, (chunk_start, chunk_end) in enumerate(chunk_bounds):
+            chunk_candidate = ' '.join(' '.join(sentences[chunk_start:chunk_end]).strip().split())
+            if chunk_end < len(sentences):
+                other_chunk_candidate = ' '.join(' '.join(sentences[chunk_start:(chunk_end + 1)]).strip().split())
+                if calculate_sentence_length(other_chunk_candidate, self.tokenizer_) <= self.max_chunk_length:
+                    chunks.append(other_chunk_candidate)
+                else:
+                    chunks.append(chunk_candidate)
+            else:
+                chunks.append(chunk_candidate)
+        return chunks
