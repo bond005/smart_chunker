@@ -114,7 +114,14 @@ for cur_chunk in chunks: print(cur_chunk + '\n')
 During the execution process, you may see the following message in the log:
 
 ```text
+Model is loaded from the "BAAI/bge-reranker-v2-m3". The device is cuda:0.
 There are 11 sentences in the text.
+All sentences tokenization with BAAI/bge-reranker-v2-m3 tokenizer is started.
+100%|█████████████████████████████████████████████████████████████████████████████████████████████| 11/11 [00:00<00:00, 2873.53it/s]
+All sentences tokenization with BAAI/bge-reranker-v2-m3 is finished.
+Chunk candidates scoring with BAAI/bge-reranker-v2-m3 model is started.
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████| 2/2 [00:10<00:00,  5.29s/it]
+Chunk candidates scoring with BAAI/bge-reranker-v2-m3 model is finished.
 Sentences from 0 to 11 have a length of 378 tokens.
 Sentences from 0 to 6 have a length of 188 tokens.
 Sentences from 0 to 6 form a new chunk.

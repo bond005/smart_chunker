@@ -15,6 +15,7 @@ except:
 
 
 class TestSmartChunker(unittest.TestCase):
+    path_to_model = None
     @classmethod
     def setUpClass(cls) -> None:
         cls.path_to_model = os.path.join(os.path.dirname(__file__), 'testdata', 'bge_reranker')

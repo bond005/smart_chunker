@@ -45,26 +45,30 @@ class SmartChunker:
             self.model_ = AutoModelForSequenceClassification.from_pretrained(
                 self.reranker_name,
                 device_map=self.device,
-                torch_dtype=torch.float16,
+                torch_dtype=torch.float32,
                 trust_remote_code=True
             )
+        if self.verbose:
+            print(f'Model is loaded from the "{self.reranker_name}". The device is {self.device}.')
 
-    def _get_pair(self, tokenized_sentences: List[List[str]],
+    def _get_pair(self, sentence_lengths: List[int],
                   split_index: int) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         middle_pos = split_index + 1
         start_pos = middle_pos - 1
+        end_pos = middle_pos + 1
+        left_length = 0
+        right_length = 0
         while start_pos >= 0:
-            left_length = sum(map(lambda it: len(it), tokenized_sentences[start_pos:middle_pos]))
-            if left_length > (self.model_.config.max_position_embeddings // 4):
+            left_length += sentence_lengths[start_pos]
+            if left_length > min(self.max_chunk_length, self.model_.config.max_position_embeddings // 2):
                 break
             start_pos -= 1
         start_pos += 1
         if start_pos >= middle_pos:
             start_pos = middle_pos - 1
-        end_pos = middle_pos + 1
-        while end_pos >= len(tokenized_sentences):
-            right_length = sum(map(lambda it: len(it), tokenized_sentences[middle_pos:end_pos]))
-            if right_length > (self.model_.config.max_position_embeddings // 4):
+        while end_pos <= len(sentence_lengths):
+            right_length += sentence_lengths[end_pos - 1]
+            if right_length > min(self.max_chunk_length, self.model_.config.max_position_embeddings // 2):
                 break
             end_pos += 1
         end_pos -= 1
@@ -147,21 +151,26 @@ class SmartChunker:
             print(f'There are {len(sentences)} sentences in the text.')
         if len(sentences) < 2:
             return sentences
-        tokenized_sentences: List[List[str]] = []
+        sentence_lengths: List[int] = []
         if self.verbose:
             print(f'All sentences tokenization with {self.reranker_name} tokenizer is started.')
         for cur_sent in (tqdm(sentences) if self.verbose else sentences):
-            tokenized_sentences.append(self.tokenizer_.tokenize(cur_sent, add_special_tokens=True))
+            sentence_lengths.append(len(self.tokenizer_.tokenize(cur_sent, add_special_tokens=True)))
+        if len(sentences) != len(sentence_lengths):
+            err_msg = (f'The sentence list size does not correspond to the sentence length list size! '
+                       f'{len(sentences)} != {len(sentence_lengths)}.')
+            raise RuntimeError(err_msg)
         if self.verbose:
             print(f'All sentences tokenization with {self.reranker_name} tokenizer is finished.')
         pairs = []
         for idx in range(len(sentences) - 1):
-            left_chunk_bounds, right_chunk_bounds = self._get_pair(tokenized_sentences, idx)
+            left_chunk_bounds, right_chunk_bounds = self._get_pair(sentence_lengths, idx)
             pairs.append([
                 ' '.join(sentences[left_chunk_bounds[0]:left_chunk_bounds[1]]),
                 ' '.join(sentences[right_chunk_bounds[0]:right_chunk_bounds[1]])
             ])
             del left_chunk_bounds, right_chunk_bounds
+        del sentence_lengths
         if self.verbose:
             print(f'Chunk candidates scoring with {self.reranker_name} model is started.')
         scores = self._calculate_similarity_func(pairs)
