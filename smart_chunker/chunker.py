@@ -1,8 +1,8 @@
-from functools import reduce
 import math
-from typing import List, Tuple
+from typing import Callable, List, Tuple
 import warnings
 
+import nltk
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from tqdm import trange, tqdm
@@ -11,18 +11,18 @@ from smart_chunker.sentenizer import split_text_into_sentences, calculate_senten
 
 
 class SmartChunker:
-    def __init__(self, language: str = 'ru', reranker_name: str = 'BAAI/bge-reranker-v2-m3',
-                 newline_as_separator: bool = True,
-                 device: str = 'cpu', max_chunk_length: int = 256, minibatch_size: int = 8, verbose: bool = False):
-        self.language = language
+    def __init__(self, reranker_name: str = 'BAAI/bge-reranker-v2-m3', device: str = 'cpu',
+                 sentence_tokenizer: Callable[[str], List[str]] = nltk.sent_tokenize, newline_as_separator: bool = True,
+                 word_tokenizer: Callable[[str], List[str]] = nltk.wordpunct_tokenize,
+                 max_chunk_length: int = 256, minibatch_size: int = 8, verbose: bool = False):
+        self.sentence_tokenizer = sentence_tokenizer
+        self.word_tokenizer = word_tokenizer
         self.reranker_name = reranker_name
         self.device = device
         self.minibatch_size = minibatch_size
         self.max_chunk_length = max_chunk_length
         self.newline_as_separator = newline_as_separator
         self.verbose = verbose
-        if self.language.strip().lower() not in {'ru', 'rus', 'russian', 'en', 'eng', 'english'}:
-            raise ValueError(f'The language {self.language} is not supported!')
         self.tokenizer_ = AutoTokenizer.from_pretrained(self.reranker_name, trust_remote_code=True)
         if self.device.lower().startswith('cuda'):
             try:
@@ -145,8 +145,11 @@ class SmartChunker:
             return []
         if calculate_sentence_length(source_text_, self.tokenizer_) <= self.max_chunk_length:
             return [source_text_]
-        sentences = split_text_into_sentences(source_text, self.newline_as_separator, self.language,
-                                              (2 * self.max_chunk_length) // 3, self.tokenizer_)
+        sentences = split_text_into_sentences(
+            source_text,
+            self.newline_as_separator, self.sentence_tokenizer, self.word_tokenizer,
+            (2 * self.max_chunk_length) // 3, self.tokenizer_
+        )
         if self.verbose:
             print(f'There are {len(sentences)} sentences in the text.')
         if len(sentences) < 2:

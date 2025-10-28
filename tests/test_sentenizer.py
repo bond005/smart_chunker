@@ -1,7 +1,10 @@
 import os
 import sys
+from typing import List
 import unittest
 
+import nltk
+import razdel
 from transformers import AutoTokenizer
 
 
@@ -10,6 +13,22 @@ try:
 except:
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     from smart_chunker.sentenizer import split_text_into_sentences, split_sentence
+
+
+def word_tokenize_en(s: str) -> List[str]:
+    return nltk.wordpunct_tokenize(s)
+
+
+def word_tokenize_ru(s: str) -> List[str]:
+    return [it.text for it in razdel.tokenize(s)]
+
+
+def sent_tokenize_en(s: str) -> List[str]:
+    return nltk.sent_tokenize(s)
+
+
+def sent_tokenize_ru(s: str) -> List[str]:
+    return [it.text for it in razdel.sentenize(s)]
 
 
 class TestSentenizer(unittest.TestCase):
@@ -37,7 +56,8 @@ class TestSentenizer(unittest.TestCase):
                        'Признательны им за доверие бренду “Сплав”, за рекомендации друзьям, за готовность делиться '
                        'своим мнением с нами. Следуя своему девизу, компания “Сплав” открывает новые пространства и '
                        'помогает делать собственные открытия своим клиентам и партнерам.')
-        sentences = split_sentence(long_sentence=source_text, max_seq_len=20, tokenizer=self.tokenizer, lang='ru')
+        sentences = split_sentence(long_sentence=source_text, max_seq_len=20, llm_tokenizer=self.tokenizer,
+                                   word_tokenizer=word_tokenize_ru)
         self.assertIsInstance(sentences, list)
         self.assertGreater(len(sentences), 1)
         for idx, val in enumerate(sentences):
@@ -50,7 +70,8 @@ class TestSentenizer(unittest.TestCase):
     def test_split_sentence_ru_02(self):
         source_text = ('Мы создаем одежду и снаряжение, которые расширяют возможности путешественников и вооруженных '
                        'профессионалов — помогают им противостоять ветру, осадкам, холоду.')
-        sentences = split_sentence(long_sentence=source_text, max_seq_len=100, tokenizer=self.tokenizer, lang='ru')
+        sentences = split_sentence(long_sentence=source_text, max_seq_len=100, llm_tokenizer=self.tokenizer,
+                                   word_tokenizer=word_tokenize_ru)
         self.assertIsInstance(sentences, list)
         self.assertEqual(len(sentences), 1)
         for idx, val in enumerate(sentences):
@@ -72,7 +93,8 @@ class TestSentenizer(unittest.TestCase):
                        'in 2022, Salomon had fully evolved into a leading footwear brand. In 2024, the opening of '
                        'a flagship store on the Champs-Élysées in Paris marked a new chapter, just in time for '
                        'the Olympic Games.')
-        sentences = split_sentence(long_sentence=source_text, max_seq_len=15, tokenizer=self.tokenizer, lang='en')
+        sentences = split_sentence(long_sentence=source_text, max_seq_len=15, llm_tokenizer=self.tokenizer,
+                                   word_tokenizer=word_tokenize_en)
         self.assertIsInstance(sentences, list)
         self.assertGreater(len(sentences), 1)
         for idx, val in enumerate(sentences):
@@ -85,7 +107,8 @@ class TestSentenizer(unittest.TestCase):
     def test_split_sentence_en_02(self):
         source_text = ('Founded in 1947 in Annecy, in the heart of the French Alps, Salomon has always been driven '
                        'by a passion for outdoor sports.')
-        sentences = split_sentence(long_sentence=source_text, max_seq_len=100, tokenizer=self.tokenizer, lang='en')
+        sentences = split_sentence(long_sentence=source_text, max_seq_len=100, llm_tokenizer=self.tokenizer,
+                                   word_tokenizer=word_tokenize_en)
         self.assertIsInstance(sentences, list)
         self.assertEqual(len(sentences), 1)
         for idx, val in enumerate(sentences):
@@ -136,7 +159,10 @@ class TestSentenizer(unittest.TestCase):
             'Следуя своему девизу, компания “Сплав” открывает новые пространства и помогает делать собственные '
             'открытия своим клиентам и партнерам.',  # 13
         ]
-        calculated_sentences = split_text_into_sentences(source_text=source_text, newline_as_separator=True)
+        calculated_sentences = split_text_into_sentences(
+            source_text=source_text, newline_as_separator=True,
+            sent_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru
+        )
         self.assertIsInstance(calculated_sentences, list)
         self.assertEqual(len(true_sentences), len(calculated_sentences))
         for idx, val in enumerate(calculated_sentences):
@@ -185,7 +211,10 @@ class TestSentenizer(unittest.TestCase):
             'Следуя своему девизу, компания “Сплав” открывает новые пространства и помогает делать собственные '
             'открытия своим клиентам и партнерам.',  # 12
         ]
-        calculated_sentences = split_text_into_sentences(source_text=source_text, newline_as_separator=False)
+        calculated_sentences = split_text_into_sentences(
+            source_text=source_text, newline_as_separator=False,
+            sent_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru
+        )
         self.assertIsInstance(calculated_sentences, list)
         self.assertEqual(len(true_sentences), len(calculated_sentences))
         for idx, val in enumerate(calculated_sentences):
@@ -193,12 +222,18 @@ class TestSentenizer(unittest.TestCase):
             self.assertEqual(val, true_sentences[idx], msg=f'Sentence {idx} is wrong.')
 
     def test_split_text_into_sentences_ru_03(self):
-        calculated_sentences = split_text_into_sentences(source_text='', newline_as_separator=True)
+        calculated_sentences = split_text_into_sentences(
+            source_text='', newline_as_separator=True,
+            sent_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru
+        )
         self.assertIsInstance(calculated_sentences, list)
         self.assertEqual(len(calculated_sentences), 0)
 
     def test_split_text_into_sentences_ru_04(self):
-        calculated_sentences = split_text_into_sentences(source_text='', newline_as_separator=False)
+        calculated_sentences = split_text_into_sentences(
+            source_text='', newline_as_separator=False,
+            sent_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru
+        )
         self.assertIsInstance(calculated_sentences, list)
         self.assertEqual(len(calculated_sentences), 0)
 
@@ -244,14 +279,20 @@ class TestSentenizer(unittest.TestCase):
             'Следуя своему девизу, компания “Сплав” открывает новые пространства и помогает делать собственные '
             'открытия своим клиентам и партнерам.',  # 12
         ]
-        calculated_sentences_1 = split_text_into_sentences(source_text=source_text, newline_as_separator=False)
+        calculated_sentences_1 = split_text_into_sentences(
+            source_text=source_text, newline_as_separator=False,
+            sent_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru
+        )
         self.assertIsInstance(calculated_sentences_1, list)
         self.assertEqual(len(true_sentences), len(calculated_sentences_1))
         for idx, val in enumerate(calculated_sentences_1):
             self.assertIsInstance(val, str, msg=f'Sentence {idx} is wrong: {val}')
             self.assertEqual(val, true_sentences[idx], msg=f'Sentence {idx} is wrong.')
-        calculated_sentences_2 = split_text_into_sentences(source_text=source_text, newline_as_separator=False,
-                                                           max_seq_len=15, tokenizer=self.tokenizer)
+        calculated_sentences_2 = split_text_into_sentences(
+            source_text=source_text, newline_as_separator=False,
+            max_seq_len=15, llm_tokenizer=self.tokenizer,
+            sent_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru
+        )
         self.assertIsInstance(calculated_sentences_2, list)
         self.assertLess(len(true_sentences), len(calculated_sentences_2))
         for idx, val in enumerate(calculated_sentences_2):
