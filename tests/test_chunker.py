@@ -1,8 +1,11 @@
 import sys
 import os
+from typing import List
 import unittest
 import warnings
 
+import nltk
+import razdel
 import torch
 
 try:
@@ -14,7 +17,16 @@ except:
     from smart_chunker.sentenizer import split_text_into_sentences
 
 
+def word_tokenize_ru(s: str) -> List[str]:
+    return [it.text for it in razdel.tokenize(s)]
+
+
+def sent_tokenize_ru(s: str) -> List[str]:
+    return [it.text for it in razdel.sentenize(s)]
+
+
 class TestSmartChunker(unittest.TestCase):
+    path_to_model = None
     @classmethod
     def setUpClass(cls) -> None:
         cls.path_to_model = os.path.join(os.path.dirname(__file__), 'testdata', 'bge_reranker')
@@ -43,10 +55,13 @@ class TestSmartChunker(unittest.TestCase):
                        'помогает делать собственные открытия своим клиентам и партнерам.')
         chunker = SmartChunker(reranker_name=self.path_to_model, newline_as_separator=True,
                                device='cuda:0' if torch.cuda.is_available() else 'cpu',
-                               max_chunk_length=50, minibatch_size=4, verbose=True)
+                               max_chunk_length=50, minibatch_size=4, verbose=True,
+                               sentence_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru)
         sentences = split_text_into_sentences(source_text, newline_as_separator=chunker.newline_as_separator,
-                                              lang=chunker.language, max_seq_len=(2 * chunker.max_chunk_length) // 3,
-                                              tokenizer=chunker.tokenizer_)
+                                              max_seq_len=(2 * chunker.max_chunk_length) // 3,
+                                              llm_tokenizer=chunker.tokenizer_,
+                                              sent_tokenizer=chunker.sentence_tokenizer,
+                                              word_tokenizer=chunker.word_tokenizer)
         chunks = chunker.split_into_chunks(source_text)
         self.assertIsInstance(chunks, list)
         self.assertGreater(len(chunks), 1)
@@ -96,10 +111,13 @@ class TestSmartChunker(unittest.TestCase):
                        'помогает делать собственные открытия своим клиентам и партнерам.')
         chunker = SmartChunker(reranker_name=self.path_to_model, newline_as_separator=False,
                                device='cuda:0' if torch.cuda.is_available() else 'cpu',
-                               max_chunk_length=50, minibatch_size=4, verbose=True)
+                               max_chunk_length=50, minibatch_size=4, verbose=True,
+                               sentence_tokenizer=sent_tokenize_ru, word_tokenizer=word_tokenize_ru)
         sentences = split_text_into_sentences(source_text, newline_as_separator=chunker.newline_as_separator,
-                                              lang=chunker.language, max_seq_len=(2 * chunker.max_chunk_length) // 3,
-                                              tokenizer=chunker.tokenizer_)
+                                              max_seq_len=(2 * chunker.max_chunk_length) // 3,
+                                              llm_tokenizer=chunker.tokenizer_,
+                                              sent_tokenizer=chunker.sentence_tokenizer,
+                                              word_tokenizer=chunker.word_tokenizer)
         chunks = chunker.split_into_chunks(source_text)
         self.assertIsInstance(chunks, list)
         self.assertGreater(len(chunks), 1)
