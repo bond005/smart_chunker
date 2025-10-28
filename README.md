@@ -75,7 +75,6 @@ After installing the **Smart-Chunker**, you can use it as a Python package in yo
 from smart_chunker.chunker import SmartChunker
 
 chunker = SmartChunker(
-    language='en',
     reranker_name='BAAI/bge-reranker-v2-m3',
     newline_as_separator=False,
     device='cuda:0',
@@ -173,6 +172,10 @@ The argument **--verbose** specifies the need to log the steps of the text split
 
 Breaking Changes
 -------
+
+**Breaking changes in version 0.0.4**
+- The bug at the long text processing is fixed.
+- The tokenization components are refactored.
 
 **Breaking changes in version 0.0.3**
 - The chunking process has been optimized by placing the call to the reranker outside the recursive portion of the process.
