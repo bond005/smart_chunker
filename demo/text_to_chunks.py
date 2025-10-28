@@ -2,12 +2,33 @@ from argparse import ArgumentParser
 import codecs
 import os
 import sys
+from typing import List
+
+import nltk
+import razdel
 
 try:
     from smart_chunker.chunker import SmartChunker
 except:
     sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
     from smart_chunker.chunker import SmartChunker
+
+
+def word_tokenize_multi(s: str) -> List[str]:
+    return nltk.wordpunct_tokenize(s)
+
+
+def word_tokenize_ru(s: str) -> List[str]:
+    return [it.text for it in razdel.tokenize(s)]
+
+
+def sent_tokenize_multi(s: str) -> List[str]:
+    return nltk.sent_tokenize(s)
+
+
+def sent_tokenize_ru(s: str) -> List[str]:
+    return [it.text for it in razdel.sentenize(s)]
+
 
 
 def main():
@@ -49,15 +70,28 @@ def main():
     if len(source_text) == 0:
         raise IOError(f'The file "{input_fname}" is empty!')
 
-    chunker = SmartChunker(
-        language=args.language,
-        reranker_name=args.model_name,
-        newline_as_separator=args.newline_as_separator,
-        device=args.device,
-        max_chunk_length=args.chunk_length,
-        minibatch_size=args.minibatch_size,
-        verbose=args.verbose
-    )
+    if args.language.strip().lower() in {'russian', 'ru', 'rus', 'russ'}:
+        chunker = SmartChunker(
+            reranker_name=args.model_name,
+            newline_as_separator=args.newline_as_separator,
+            device=args.device,
+            max_chunk_length=args.chunk_length,
+            minibatch_size=args.minibatch_size,
+            verbose=args.verbose,
+            sentence_tokenizer=sent_tokenize_ru,
+            word_tokenizer=word_tokenize_ru
+        )
+    else:
+        chunker = SmartChunker(
+            reranker_name=args.model_name,
+            newline_as_separator=args.newline_as_separator,
+            device=args.device,
+            max_chunk_length=args.chunk_length,
+            minibatch_size=args.minibatch_size,
+            verbose=args.verbose,
+            sentence_tokenizer=sent_tokenize_multi,
+            word_tokenizer=word_tokenize_multi
+        )
     print('The smart chunker is prepared.')
 
     chunks = chunker.split_into_chunks(source_text)

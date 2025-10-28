@@ -158,7 +158,7 @@ The argument **-i** is an input file with text that needs to be split into chunk
 
 The argument **-o** is an output file that will contain the result of splitting the source text into chunks (each chunk is on a separate line).
 
-The argument **--lang** is a language of the source text (`russian` or `english`).
+The argument **--lang** is a language of the source text.
 
 The argument **--device** specifies a device to use for inference (I recommend setting `cuda` or `cuda:0`, but `cpu` can also be used).
 
