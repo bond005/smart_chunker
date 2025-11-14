@@ -1,4 +1,5 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install
 
 import smart_chunker
 
@@ -23,6 +24,20 @@ as a cross encoder.
 
 The smart chunker supports Russian and English.
 '''
+
+class PostInstallCommand(install):
+    def run(self):
+        super().run()
+        try:
+            import nltk
+
+            try:
+                nltk.data.find('tokenizers/punkt')
+            except LookupError:
+                nltk.download('punkt')
+        except Exception as e:
+            print(f"Warning: could not ensure nltk punkt data is available: {e}")
+
 
 setup(
     name='smart-chunker',
@@ -50,6 +65,7 @@ setup(
         'Programming Language :: Python :: 3.12',
     ],
     keywords=['smart-chunker', 'rag', 'chunker', 'cross-encoder', 'encoder', 'reranker'],
-    install_requires=['nltk', 'nltk-punkt', 'razdel==0.5.0', 'sentencepiece', 'torch>=2.0.1', 'transformers>=4.38.1'],
+    install_requires=['nltk', 'razdel==0.5.0', 'sentencepiece', 'torch>=2.0.1', 'transformers>=4.38.1'],
+    cmdclass={'install': PostInstallCommand},
     test_suite='tests'
 )
