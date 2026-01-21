@@ -9,6 +9,11 @@ from tqdm import trange, tqdm
 
 from smart_chunker.sentenizer import split_text_into_sentences, calculate_sentence_length
 
+try:
+    nltk.download("punkt_tab")
+except LookupError:
+    print("Looks like it is impossible to download or find''punkt_tab' package. Try to download it manually by 'nltk.download('punkt_tab')'")
+
 
 class SmartChunker:
     def __init__(self, reranker_name: str = 'BAAI/bge-reranker-v2-m3', device: str = 'cpu',

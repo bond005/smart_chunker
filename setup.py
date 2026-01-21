@@ -50,6 +50,6 @@ setup(
         'Programming Language :: Python :: 3.12',
     ],
     keywords=['smart-chunker', 'rag', 'chunker', 'cross-encoder', 'encoder', 'reranker'],
-    install_requires=['nltk', 'nltk-punkt', 'razdel==0.5.0', 'sentencepiece', 'torch>=2.0.1', 'transformers>=4.38.1'],
+    install_requires=['nltk', 'razdel==0.5.0', 'sentencepiece', 'torch>=2.0.1', 'transformers>=4.38.1', 'accelerate==1.12.0'],
     test_suite='tests'
 )
