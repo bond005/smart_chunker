@@ -173,6 +173,9 @@ The argument **--verbose** specifies the need to log the steps of the text split
 Breaking Changes
 -------
 
+**Breaking changes in version 0.0.5**
+- The bug at using of nltk.punct in the requirements is fixed.
+
 **Breaking changes in version 0.0.4**
 - The bug at the long text processing is fixed.
 - The tokenization components are refactored.
